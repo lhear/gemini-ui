@@ -15,7 +15,6 @@
 
 *   **Vue3:** 前端框架
 *   **@google/generative-ai:** Google Gemini API 的 JavaScript 客户端
-*   **lodash-es:** JavaScript 实用工具库（ES 模块版本）
 *   **lz-string:** 用于字符串压缩
 *   **markdown-it:** Markdown 解析器
 

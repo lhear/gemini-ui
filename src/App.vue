@@ -1,68 +1,69 @@
 <template>
-  <div class="chat-container" ref="chatContainer" @scroll="handleScroll">
-    <div v-for="e in slicedContext" class="message-row" :class="{ 'user-message-row': e.role == 'user' }" :key="e.id">
-      <div v-for="e1 in e.parts" class="message-bubble"
-        :class="{ 'user-bubble': e.role == 'user', 'assistant-bubble': e.role != 'user' }">
-        <template v-if="e.role == 'user'">{{ e1.text }}</template>
-        <template v-else>
-          <div v-html="markdown.render(e1.text)" class="markdown-body"></div>
-        </template>
+  <div class="container">
+    <div class="chat-container" ref="chatContainer" @scroll="handleScroll">
+      <div v-for="e in slicedContext" class="message-row" :class="{ 'user-message-row': e.role == 'user' }" :key="e.id">
+        <div v-for="e1 in e.parts" class="message-bubble"
+          :class="{ 'user-bubble': e.role == 'user', 'assistant-bubble': e.role != 'user' }">
+          <template v-if="e.role == 'user'">{{ e1.text }}</template>
+          <template v-else>
+            <div v-html="markdown.render(e1.text)" class="markdown-body"></div>
+          </template>
+        </div>
+      </div>
+      <div v-show="showMenu" class="message-bubble menu-bubble">
+        <div class="menu-item" @click="showMenu = false; showSetting = true;">设置</div><br><br>
+        <div class="menu-item" @click="showMenu = false; removeLast()">删除最后</div><br><br>
+        <div class="menu-item" @click="showMenu = false; clear()">清除对话</div>
+      </div>
+      <div v-show="showSetting" class="message-bubble menu-bubble">
+        <div class="menu-item" @click="showSetting = false; setBaseUrl()">设置API地址</div><br><br>
+        <div class="menu-item" @click="showSetting = false; setApiKey()">设置API密钥</div><br><br>
+        <div class="menu-item" @click="showSetting = false; setModel()">设置模型</div><br><br>
+        <div class="menu-item" @click="showSetting = false; setSystemInstruction()">设置系统提示词</div>
+        <br><br>
+        <div class="menu-item" @click="showSetting = false; setMaxOutputTokens()">设置输出令牌限制</div>
+        <br><br>
+        <div class="menu-item" @click="showSetting = false; setTemperature()">设置温度</div><br><br>
+        <div class="menu-item" @click="showSetting = false; switchSearchDisabled()">{{ searchDisabled ? "启用" : "禁用"
+        }}搜索
+        </div><br><br>
+        <div class="menu-item" @click="showSetting = false; exportConfig()">导出设置到粘贴板</div><br><br>
+        <div class="menu-item" @click="showSetting = false; importConfig()">从粘贴板导入设置</div>
+      </div>
+      <div v-show="alert.show" class="message-bubble menu-bubble">
+        <div class="alert-text">{{ alert.text }}</div><br>
+        <div class="menu-item" @click="alert.show = false; alert.onclick()">确定</div>
+      </div>
+      <div v-show="prompt.show" class="message-bubble menu-bubble">
+        <div class="prompt-title">{{ prompt.title }}</div><br>
+        <div>
+          <input class="prompt-input" placeholder="在此输入" type="text" :value="prompt.text"
+            @input="(e) => { prompt.text = e.target.value }" size="25">
+        </div><br>
+        <div class="menu-item" @click="prompt.show = false; prompt.onclick()">确定</div>
       </div>
     </div>
-    <div v-show="showMenu" class="message-bubble menu-bubble">
-      <div class="menu-item" @click="showMenu = false; showSetting = true;">设置</div><br><br>
-      <div class="menu-item" @click="showMenu = false; removeLast()">删除最后</div><br><br>
-      <div class="menu-item" @click="showMenu = false; clear()">清除对话</div>
+    <div class="toolbar" ref="toolbar">
+      <button @click="clickMenu" class="help-button">
+        {{ submitDisabled ? loadingChats[loadingChatIndex] : "?" }}
+      </button>
+      <textarea ref="textarea" v-model="input" placeholder="想说什么呢？" class="input-box"></textarea>
+      <button @click="submit" class="submit-button" v-show="!submitDisabled && input.trim().length > 0">⇧</button>
     </div>
-    <div v-show="showSetting" class="message-bubble menu-bubble">
-      <div class="menu-item" @click="showSetting = false; setBaseUrl()">设置API地址</div><br><br>
-      <div class="menu-item" @click="showSetting = false; setApiKey()">设置API密钥</div><br><br>
-      <div class="menu-item" @click="showSetting = false; setModel()">设置模型</div><br><br>
-      <div class="menu-item" @click="showSetting = false; setSystemInstruction()">设置系统提示词</div>
-      <br><br>
-      <div class="menu-item" @click="showSetting = false; setMaxOutputTokens()">设置输出令牌限制</div>
-      <br><br>
-      <div class="menu-item" @click="showSetting = false; setTemperature()">设置温度</div><br><br>
-      <div class="menu-item" @click="showSetting = false; switchSearchDisabled()">{{ searchDisabled ? "启用" : "禁用"
-      }}搜索
-      </div>
+    <div class="scrollbar-container" ref="scrollbarContainer">
+      <div ref="scrollBar" class="scrollbar-thumb"></div>
+      <Transition>
+        <div class="scrollbar-track-bg" v-show="showScrollBar"></div>
+      </Transition>
     </div>
-    <div v-show="alert.show" class="message-bubble menu-bubble">
-      <div class="alert-text">{{ alert.text }}</div><br>
-      <div class="menu-item" @click="alert.show = false; alert.onclick()">确定</div>
-    </div>
-    <div v-show="prompt.show" class="message-bubble menu-bubble">
-      <div class="prompt-title">{{ prompt.title }}</div><br>
-      <div>
-        <input class="prompt-input" placeholder="在此输入" type="text" :value="prompt.text"
-          @input="(e) => { prompt.text = e.target.value }" size="25">
-      </div><br>
-      <div class="menu-item" @click="prompt.show = false; prompt.onclick()">确定</div>
-    </div>
-  </div>
-  <div class="toolbar" ref="toolbar">
-    <button @click="clickMenu" class="help-button" :disabled="submitDisabled">{{
-      submitDisabled ?
-        loadingChats[loadingChatIndex] : "?" }}</button>
-    <textarea ref="textarea" v-model="input" placeholder="想说什么呢？" class="input-box"></textarea>
-    <button @click="submit" class="submit-button" v-show="!submitDisabled && input.trim().length > 0">
-      {{ submitDisabled ? loadingChats[loadingChatIndex] : "⇧" }}
-    </button>
-  </div>
-  <div class="scrollbar-container" ref="scrollbarContainer">
-    <div ref="scrollBar" class="scrollbar-thumb"></div>
-    <Transition>
-      <div class="scrollbar-track-bg" v-show="showScrollBar"></div>
-    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick, computed } from "vue";
+import { ref, onMounted, watch, nextTick, computed, watchEffect } from "vue";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import MarkdownIt from "markdown-it";
 import { compress, decompress } from 'lz-string';
-import { throttle } from 'lodash-es';
 
 const markdown = new MarkdownIt();
 const chatContainer = ref(null);
@@ -99,7 +100,7 @@ const prompt = ref({
 });
 
 let genAI, model, chat, loadingChatInterval,
-  handleScrollLock = false, scrollbarHideTimer;
+  handleScrollLock = false, scrollbarHideTimer, abortController = new AbortController();;
 
 const defaultBaseUrl = "https://generativelanguage.googleapis.com";
 const defaultModel = "gemini-2.0-flash";
@@ -109,7 +110,7 @@ const defaultMaxOutputTokens = 8192;
 const defaultSearchDisabled = false;
 const defaultRenderedContextStep = 30;
 
-const loadingChats = ["|", "/", "--", "\\"];
+const loadingChats = ["|", "/", "-", "\\"];
 
 const slicedContext = computed(() => {
   return context.value.slice(renderedContextLength.value * -1);
@@ -156,7 +157,12 @@ onMounted(() => {
     temperature.value = defaultTemperature;
   }
 
-  nextTick(() => rollToBottom(false));
+  watchEffect(async () => {
+    if (context.value.length == 0) return;
+    nextTick(() => {
+      rollToBottom();
+    })
+  })
 
   if (!apiKey.value) {
     alert.value = {
@@ -194,7 +200,7 @@ const initAI = () => {
     }
   );
   chat = model.startChat({
-    history: cloneArray(context.value)
+    history: context.value.map(item => ({ role: item.role, parts: item.parts }))
   });
 }
 
@@ -215,10 +221,9 @@ watch(input, (newVal, oldVal) => {
       nextTick(() => rollToBottom());
     }
     textarea.value.style.height = textarea.value.scrollHeight + "px";
-    toolbar.value.style.height = "calc(" + textarea.value.scrollHeight + "px + 6vw)";
-    chatContainer.value.style.paddingBottom = "min(calc(40px + 6vw + " +
-      (textarea.value.scrollHeight - 40).toFixed(0) + "px), calc(50vh + 6vw))";
-    scrollbarContainer.value.style.height = "calc(100vh - 6vw - " + textarea.value.scrollHeight + "px)";
+    toolbar.value.style.height = "calc(" + textarea.value.offsetHeight + "px + max(3vw,3vh) + 6px)";
+    chatContainer.value.style.paddingBottom = toolbar.value.offsetHeight + "px";
+    scrollbarContainer.value.style.height = "calc(100vh - " + toolbar.value.offsetHeight + "px)";
   });
 })
 
@@ -252,7 +257,7 @@ watch(alert, (newVal, oldVal) => {
 
 const handleScroll = () => {
   let element = chatContainer.value;
-  throttledUpdateScrollBar();
+  updateScrollBar();
   if (handleScrollLock) return;
   if (element.scrollTop < 10 && renderedContextLength.value < context.value.length) {
     handleScrollLock = true;
@@ -264,10 +269,7 @@ const handleScroll = () => {
     nextTick(() => {
       const newScrollHeight = element.scrollHeight;
       const scrollHeightDiff = newScrollHeight - oldScrollHeight;
-      element.scrollTo({
-        top: oldScrollTop + scrollHeightDiff,
-        behavior: 'instant'
-      });
+      element.scrollTop = oldScrollTop + scrollHeightDiff;
       handleScrollLock = false;
       element.style.overflow = "auto";
     });
@@ -276,10 +278,13 @@ const handleScroll = () => {
 
 const submit = async () => {
   if (!apiKey.value) {
+    closeMenu();
     alert.value = {
       show: true,
       text: "请设置API密钥!",
-      onclick: () => { }
+      onclick: () => {
+        setApiKey();
+      }
     };
     return;
   }
@@ -293,32 +298,38 @@ const submit = async () => {
     context.value.pop();
   }
   context.value.push({ id: context.value.length, role: "user", parts: [{ text: t }] });
-  await nextTick(() => rollToBottom());
 
   try {
-    const result = await chat.sendMessageStream(t);
+    const result = await chat.sendMessageStream(t, { signal: abortController.signal });
     context.value.push({ id: context.value.length, role: "model", parts: [{ text: "" }] });
-    await nextTick(() => rollToBottom());
+
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
       context.value[context.value.length - 1].parts[0].text += chunkText;
       if (isScrollAtBottom()) {
         await nextTick(() => rollToBottom());
       }
+      if (abortController.signal.aborted) break;
     }
     submitDisabled.value = false;
     localStorage.setItem("history", compress(JSON.stringify(context.value)));
   } catch (error) {
-    submitDisabled.value = false;
     if (context.value[context.value.length - 1].role == "user" && input.value.length == 0) {
       input.value = t;
       context.value.pop();
     }
+    let msg = error.message;
+    if (error.name == "AbortError" || msg.includes("aborted")) return;
+    if (msg.includes("API key not valid.")) msg = "无效的API密钥!";
+    if (msg.includes("Load failed")) msg = "加载失败!\n\n" + msg;
     alert.value = {
       show: true,
-      text: "操作失败！\n\n" + error,
+      text: "操作失败！\n\n" + msg,
       onclick: () => { }
     };
+  } finally {
+    abortController = new AbortController();
+    submitDisabled.value = false;
   }
 }
 
@@ -333,22 +344,15 @@ const isScrollAtBottom = () => {
 const rollToBottom = () => {
   const element = chatContainer.value;
   element.style.overflow = "hidden";
-  element.scrollTo({
-    top: element.scrollHeight,
-    behavior: 'instant'
-  });
+  element.scrollTop = element.scrollHeight;
   element.style.overflow = "auto";
 }
 
-const cloneArray = (arr) => {
-  let t = [];
-  for (let i = 0; i < arr.length; i++) {
-    t[i] = { role: arr[i].role, parts: arr[i].parts };
-  }
-  return t;
-}
-
 const clickMenu = () => {
+  if (submitDisabled.value) {
+    abortController.abort();
+    return;
+  }
   if (showMenu.value) {
     showMenu.value = false;
     return;
@@ -393,8 +397,6 @@ const updateScrollBar = () => {
   }, 700);
 }
 
-const throttledUpdateScrollBar = throttle(updateScrollBar, 3);
-
 const clear = () => {
   input.value = "";
   context.value = [];
@@ -411,7 +413,7 @@ const removeLast = () => {
     context.value[context.value.length - 1].role == "user");
 
   chat = model.startChat({
-    history: cloneArray(context.value)
+    history: context.value.map(item => ({ role: item.role, parts: item.parts }))
   });
   localStorage.setItem("history", compress(JSON.stringify(context.value)));
 }
@@ -517,23 +519,97 @@ const switchSearchDisabled = () => {
   };
 }
 
+const importConfig = async () => {
+  const text = await navigator.clipboard.readText();
+  let obj;
+
+  try {
+    obj = JSON.parse(text);
+  } catch (error) {
+    console.error(error.message);
+  }
+  if (!obj || !obj.api_key || !obj.base_url || !obj.model ||
+    !obj.system_instruction || !obj.max_output_tokens ||
+    !obj.temperature || obj.search_disabled == null) {
+    alert.value = {
+      show: true,
+      text: "未从粘贴板中找到有效配置",
+      onclick: () => { }
+    };
+    return;
+  }
+
+  apiKey.value = obj.api_key;
+  baseUrl.value = obj.base_url;
+  aiModel.value = obj.model;
+  systemInstruction.value = obj.system_instruction;
+  maxOutputTokens.value = obj.max_output_tokens;
+  temperature.value = obj.temperature;
+  searchDisabled.value = obj.search_disabled;
+
+  localStorage.setItem("apiKey", apiKey.value);
+  localStorage.setItem("baseUrl", baseUrl.value);
+  localStorage.setItem("model", aiModel.value);
+  localStorage.setItem("systemInstruction", systemInstruction.value);
+  localStorage.setItem("maxOutputTokens", maxOutputTokens.value);
+  localStorage.setItem("temperature", temperature.value);
+  localStorage.setItem("searchDisabled", searchDisabled.value);
+
+  alert.value = {
+    show: true,
+    text: "配置已导入",
+    onclick: () => { }
+  };
+
+  initAI();
+}
+
+const exportConfig = async () => {
+  const text = JSON.stringify({
+    api_key: apiKey.value,
+    base_url: baseUrl.value,
+    model: aiModel.value,
+    system_instruction: systemInstruction.value,
+    max_output_tokens: maxOutputTokens.value,
+    temperature: temperature.value,
+    search_disabled: searchDisabled.value
+  });
+  await navigator.clipboard.writeText(text);
+  alert.value = {
+    show: true,
+    text: "已导出配置到粘贴板",
+    onclick: () => { }
+  };
+}
+
 </script>
 
 <style scoped>
+.container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background-color: #ffffff;
+}
+
 .chat-container {
   width: 100%;
-  padding: 3vw;
+  padding: min(3vw, 3vh) max(3vw, 3vh) 0 max(3vw, 3vh);
   border-radius: 5px;
   overflow-y: auto;
   overflow-x: hidden;
   height: 100vh;
   padding-bottom: calc(6vw + 40px);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .chat-container::-webkit-scrollbar {
   display: none;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none;
+  background: transparent;
 }
 
 .message-row {
@@ -588,6 +664,7 @@ const switchSearchDisabled = () => {
   border: none;
   border-radius: 15px;
   padding: 5px;
+  font-size: 16px;
 }
 
 .alert-text,
@@ -596,28 +673,13 @@ const switchSearchDisabled = () => {
 }
 
 .toolbar {
-  position: fixed;
+  position: absolute;
   width: 100vw;
-  min-height: calc(40px + 6vw);
-  bottom: 0;
+  min-height: calc(40px + max(3vw, 3vh) + 6px);
+  bottom: env(safe-area-inset-bottom);
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   will-change: backdrop-filter;
-  max-height: calc(50vh + 6vw);
-}
-
-.input-box {
-  width: calc(100% - 40px - 9vw);
-  height: 40px;
-  padding: 9px 38px 7px 10px;
-  border: 1px solid #ddd;
-  border-radius: 18px;
-  position: absolute;
-  bottom: 3vw;
-  left: calc(40px + 6vw);
-  max-height: 50vh;
-  min-height: 40px;
-  background: none;
 }
 
 .help-button {
@@ -632,11 +694,27 @@ const switchSearchDisabled = () => {
   font-size: 16px;
   font-weight: bold;
   position: absolute;
-  left: 3vw;
-  bottom: 3vw;
+  left: max(3vw, 3vh);
+  bottom: max(3vw, 3vh);
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: 1s;
+}
+
+.input-box {
+  width: calc(100vw - 40px - (3 * max(3vw, 3vh)));
+  height: 40px;
+  padding: 9px 38px 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 18px;
+  position: absolute;
+  bottom: max(3vw, 3vh);
+  left: calc(40px + (max(3vw, 3vh)*2));
+  max-height: 50vh;
+  min-height: 40px;
+  background: none;
+  font-size: 16px;
 }
 
 .help-button:hover {
@@ -655,8 +733,8 @@ const switchSearchDisabled = () => {
   font-size: 16px;
   font-weight: bold;
   position: absolute;
-  right: calc(3vw + 5px);
-  bottom: calc(3vw + 5px);
+  right: calc(max(3vw, 3vh) + 5px);
+  bottom: calc(max(3vw, 3vh) + 5px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -667,18 +745,17 @@ const switchSearchDisabled = () => {
 }
 
 .scrollbar-container {
-  position: fixed;
+  position: absolute;
   right: 3px;
   top: 0;
   width: 3px;
-  height: calc(100vh - 40px - 6vw);
-  min-height: calc(50vh - 6vw);
+  height: calc(100vh - (40px + max(3vw, 3vh) + 6px));
 }
 
 .scrollbar-thumb {
   height: 0;
   max-height: calc(100% - 50px);
-  transition: 50ms;
+  transition: 60ms;
 }
 
 .scrollbar-track-bg {
@@ -698,9 +775,14 @@ const switchSearchDisabled = () => {
 
 html,
 body {
-  overflow: hidden;
-  height: 100%;
+  overflow: auto;
+  height: 100vh;
+  width: 100vw;
   margin: 0px;
+  padding: 0px;
+  background-color: #ffffff;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 input:focus,
@@ -710,13 +792,18 @@ textarea:focus {
 
 input,
 textarea {
-  font-size: 16px;
   resize: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
 textarea::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none;
   background: transparent;
 }
 
